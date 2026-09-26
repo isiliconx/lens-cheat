@@ -1,0 +1,66 @@
+# lens configuration. Every value here is read by the runtime; nothing in the
+# code reads a hardcoded setting.
+#
+#   lens run adapters/sim.yaml --config config/lens.yaml
+
+target:
+  descriptor: adapters/sim.yaml
+  transport: sim
+  process: /lens_sim
+
+viewport:
+  w: 1280
+  h: 720
+  hz: 60
+
+output:
+  dump_ppm: out/frame.ppm
+  dump_svg: out/frame.svg
+  snapshot: out/snapshot.json
+
+# Writes require BOTH this and --write on the command line. A read-only run
+# cannot modify the target even if a script asks it to.
+write:
+  allow: false
+
+esp:
+  enabled: true
+  box: true
+  box_style: 0            # 0 = 2D rect, 1 = cornered, 2 = 3D box
+  box_3d: false
+  skeleton: false
+  health_bar: true
+  health_text: true
+  name: true
+  distance: true
+  weapon: false
+  team_check: true
+  local_team: 0           # 0 = read it off the local entity
+  hide_friends: true
+  hide_dead: true
+  hide_local: true
+  offscreen_indicator: true
+  aimed_highlight: false
+  max_distance: 0         # 0 = unlimited
+
+panel:
+  enabled: true
+  show_resolution: true
+  show_entities: true
+  show_health: true
+  show_fps: true
+  x: 12
+  y: 12
+
+editor:
+  enabled: false
+  write_enabled: false
+
+keys:
+  panel_toggle: 0x70      # F1
+  editor_toggle: 0x71     # F2
+  dump_frame: 0x72         # F3
+  editor_up: 0x26          # up arrow
+  editor_down: 0x28        # down arrow
+  editor_commit: 0x0D      # enter
+  editor_cancel: 0x1B      # esc

@@ -1,0 +1,123 @@
+# lens adapter: the synthetic target.
+#
+# This is the reference adapter and the one the self-test runs against. Every
+# value here is either a signature (scan for it) or a schema name (ask the
+# target where it put it). There is not a single hardcoded address.
+#
+#   lens resolve adapters/sim.yaml
+#   lens dump    adapters/sim.yaml out.ppm --svg out.svg
+#   lens selftest
+#
+# Entity field offsets below are the ones `lens list` prints. They are offsets
+# into the target's own struct, discovered by tools/entity_probe.cpp; the struct
+# layout is in src/sim/sim_layout.h. Change the sim, re-run the probe, update
+# here.
+
+target:
+  name: sim
+  engine: custom
+  process: /lens_sim            # the sim transport's shared-memory segment
+  transport: sim
+
+modules:
+  - name: lens_sim_module
+    sig: 48 8B 05 ?? ?? ?? ?? 48 85 C0     # the code stub; if it moves, this dies first
+
+# The target publishes its own schema table (see sim_layout.h). lens reads it
+# generically: scan for the stub, follow the RIP-relative pointer to the table,
+# then walk entries until the terminator. The array address, live-count pointer
+# and element stride all come from the target, not from this file, so the
+# descriptor never bakes an address.
+schema_table:
+  module: lens_sim_module
+  ptr_sig: 48 8B 05 ?? ?? ?? ?? 48 85 C0 74 10 EB 10
+  match: 1                 # skip the decoy at text+0x1000; the real one is text+0x2000
+  rip_offset: 3
+  entry_stride: 64         # sizeof(SimSchemaEntry)
+  array_off: 0             # u64 array_addr
+  count_off: 8             # u32 count
+  stride_off: 12           # u32 stride
+  name_off: 20             # u32 name_hash
+  countptr_off: 24         # u64 array_count_addr
+  name_str_off: 32         # char[32] name
+  name_str_max: 31
+  max_entries: 64
+  publish_as: sim           # keys become "players", "decoy_roster", ...
+
+lists:
+  - name: players
+    module: lens_sim_module
+    count_schema: players          # the target publishes this table itself
+    max: 64
+    fields:
+      - name: pos
+        kind: pointer
+        module: lens_sim_module
+        offset: 0                  # f32x3 origin
+        deref: 0
+        type: f32x3
+      - name: health
+        kind: pointer
+        module: lens_sim_module
+        offset: 12                 # f32
+        type: f32
+        writable: true
+      - name: team
+        kind: pointer
+        module: lens_sim_module
+        offset: 16                 # i32
+        type: i32
+      - name: alive
+        kind: pointer
+        module: lens_sim_module
+        offset: 20                 # i32
+        type: i32
+      - name: weapon
+        kind: pointer
+        module: lens_sim_module
+        offset: 24                 # i32
+        type: i32
+      - name: local
+        kind: pointer
+        module: lens_sim_module
+        offset: 28                 # i32, non-zero on "me"
+        type: i32
+      - name: bones
+        kind: pointer
+        module: lens_sim_module
+        offset: 32                 # f32x3[24]
+        type: f32x3
+        count: 24
+      - name: name
+        kind: pointer
+        module: lens_sim_module
+        offset: 320                # char[32]
+        type: str
+        count: 32
+
+# The camera is a SimCamera: viewproj mat4 at 0, eye f32x3 at 64, fov at 80.
+# Its address is found the same way the schema table's is: scan for the stub,
+# follow the RIP-relative pointer. The second real stub reads the camera cell.
+camera:
+  view:
+    name: view
+    kind: pointer
+    schema: camera           # the sim publishes its camera table too
+    offset: 0                 # f32x4[4] viewproj
+    type: mat4
+  pos:
+    name: pos
+    kind: pointer
+    schema: camera
+    offset: 64                # f32x3 eye
+    type: f32x3
+  fov:
+    name: fov
+    kind: pointer
+    schema: camera
+    offset: 80                # f32 fov_deg
+    type: f32
+
+# Which field marks "this is me". ESP hides the entity whose value in this field
+# is non-zero, and reports it as the local player.
+local_field: local

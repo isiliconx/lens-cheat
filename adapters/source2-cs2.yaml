@@ -1,0 +1,119 @@
+# lens adapter: Source 2 family (CS2, CSGO, Deadlock, Dota 2).
+#
+# Schema-driven. CS2 hands out its own field table at runtime, so the entity
+# list and every field on it are reached by asking the target for the name
+# rather than by a baked offset. That is what survives a game update: the
+# engine renumbers its internal indices, lens does not care.
+#
+# The two signatures below are the only thing that can break, and when they do,
+# `lens resolve` says "anchor signature absent" and names the module.
+#
+#   lens resolve adapters/source2-cs2.yaml
+#   lens run     adapters/source2-cs2.yaml --frames 600
+
+target:
+  name: cs2
+  engine: source2
+  process: cs2.exe
+  transport: win
+  min_build: 900000
+
+modules:
+  - name: client.dll
+    # The entity-system entry that hands out the schema list. A 4-byte-wildcard
+    # signature: 48 8D 0D <disp32> is the classic lea rcx, [rip+rel32] prologue.
+    sig: 48 8D 0D ?? ?? ?? ?? 48 8B 46 08
+  - name: engine2.dll
+    sig: 48 89 5C 24 ?? 48 89 6C 24 ?? 48 89 74 24 ??
+
+lists:
+  # The player roster. The array is the engine's entity list for CBasePlayer;
+  # count comes from the schema's own count pointer, so a round going from 10
+  # to 10 players, or a disconnected slot, is read correctly without a rescan.
+  - name: players
+    module: client.dll
+    count_schema: CBasePlayerList
+    max: 128
+    fields:
+      - name: pos
+        kind: schema
+        schema: m_vecOrigin
+        type: f32x3
+      - name: health
+        kind: schema
+        schema: m_iHealth
+        type: i32
+      - name: team
+        kind: schema
+        schema: m_iTeamNum
+        type: i32
+      - name: life_state
+        kind: schema
+        schema: m_lifeState
+        type: i32
+      - name: name
+        kind: schema
+        schema: m_szPlayerName
+        type: str
+        count: 64
+      - name: weapon
+        kind: schema
+        schema: m_hActiveWeapon
+        type: ptr
+      - name: armor
+        kind: schema
+        schema: m_ArmorValue
+        type: i32
+      - name: spotted
+        kind: schema
+        schema: m_bSpotted
+        type: i32
+      - name: flashed
+        kind: schema
+        schema: m_flFlashDuration
+        type: f32
+      - name: bones
+        kind: schema
+        schema: m_CachedBoneData
+        type: f32x3
+        count: 128
+        stride: 48
+
+  # Dropped weapons and utilities on the ground.
+  - name: items
+    module: client.dll
+    count_schema: CDroppedItemPool
+    max: 256
+    fields:
+      - name: pos
+        kind: schema
+        schema: m_vecOrigin
+        type: f32x3
+      - name: item_name
+        kind: schema
+        schema: m_szItemName
+        type: str
+        count: 64
+      - name: item_index
+        kind: schema
+        schema: m_iItemDefinitionIndex
+        type: i32
+
+camera:
+  view:
+    name: view
+    kind: schema
+    schema: CViewMatrix
+    type: mat4
+  pos:
+    name: pos
+    kind: schema
+    schema: CLocalPlayerCameraOrigin
+    type: f32x3
+  fov:
+    name: fov
+    kind: schema
+    schema: m_flFOV
+    type: f32
+
+local_field: local

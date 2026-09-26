@@ -1,0 +1,110 @@
+# lens adapter: Unreal Engine 4 and 5 (UE4 titles, Fortnite, Lyra, any UE project).
+#
+# UE keeps its reflected field table at runtime too, so this adapter asks the
+# engine for each field by name and never hardcodes a struct offset. The three
+# signatures are the three places UE's layout has historically changed most,
+# and they are the only things `lens diff` will ever report as broken.
+#
+#   lens resolve adapters/ue5.yaml
+#   lens run     adapters/ue5.yaml --frames 600 --write
+
+target:
+  name: ue5
+  engine: unreal
+  process: unreal_target.exe
+  transport: win
+
+modules:
+  - name: unreal_target.exe
+    # GWorld: the mov rcx, [rip+disp32] that hands back the UObject array.
+    sig: 48 8B 05 ?? ?? ?? ?? 48 8B 0C C8 48 8D 04 D1
+  - name: unreal_target.exe-core
+    # GUObjectArray's lock path, used as the anchor for the object range.
+    sig: 48 89 5C 24 ?? 48 89 6C 24 ?? 48 89 74 24 ??
+  - name: unreal_target.exe
+    # FName pool resolve, the standard 3-instruction sequence.
+    sig: 48 8B 05 ?? ?? ?? ?? 48 85 C0 74 ?? 48 8B 05 ?? ?? ?? ??
+
+lists:
+  - name: pawns
+    module: unreal_target.exe
+    count_schema: UWorld.ActorArray
+    max: 512
+    fields:
+      - name: pos
+        kind: schema
+        schema: AActor.RootComponent.RelativeLocation
+        type: f32x3
+      - name: rotation
+        kind: schema
+        schema: AActor.RootComponent.RelativeRotation
+        type: f32x3
+      - name: scale
+        kind: schema
+        schema: AActor.RootComponent.RelativeScale3D
+        type: f32x3
+      - name: health
+        kind: schema
+        schema: APawn.Health
+        type: f32
+      - name: team
+        kind: schema
+        schema: AController.TeamId
+        type: i32
+      - name: class_name
+        kind: schema
+        schema: AActor.GetName
+        type: str
+        count: 64
+      - name: mesh
+        kind: schema
+        schema: USkeletalMeshComponent
+        type: ptr
+      - name: bones
+        kind: schema
+        schema: USkinnedMeshComponent.BoneSpaceTransforms
+        type: f32x3
+        count: 96
+        stride: 48
+      - name: visibility
+        kind: schema
+        schema: AActor.bHidden
+        type: i32
+
+  - name: items
+    module: unreal_target.exe
+    count_schema: UWorld.ActorArray
+    max: 512
+    fields:
+      - name: pos
+        kind: schema
+        schema: AActor.RootComponent.RelativeLocation
+        type: f32x3
+      - name: class_name
+        kind: schema
+        schema: AActor.GetName
+        type: str
+        count: 64
+      - name: item_id
+        kind: schema
+        schema: AActor.ItemId
+        type: i32
+
+camera:
+  view:
+    name: view
+    kind: schema
+    schema: APlayerCameraManager.ViewProjectionMatrix
+    type: mat4
+  pos:
+    name: pos
+    kind: schema
+    schema: APlayerCameraManager.CameraCachePrivate.POV.Location
+    type: f32x3
+  fov:
+    name: fov
+    kind: schema
+    schema: APlayerCameraManager.DefaultFOV
+    type: f32
+
+local_field: local

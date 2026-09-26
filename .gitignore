@@ -1,0 +1,8 @@
+build/
+out/
+selftest_a.json
+selftest_frame.ppm
+*.o
+*.d
+lens
+lens_sim
